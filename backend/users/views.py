@@ -143,3 +143,33 @@ class GoogleLoginView(APIView):
             
         except ValueError as e:
             return Response({"detail": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+        
+class CookReviewsView(generics.ListAPIView):
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request, username):
+        from orders.models import Review
+        from orders.serializers import ReviewSerializer
+        
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({"detail": "Cook not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        reviews = Review.objects.filter(
+            order__listing__cook=user
+        ).select_related('order', 'reviewer', 'order__listing').order_by('-created_at')
+        
+        # Custom serialization to include more info
+        data = []
+        for review in reviews:
+            data.append({
+                'id': review.id,
+                'rating': review.rating,
+                'comment': review.comment,
+                'reviewer_name': review.reviewer.username,
+                'listing_title': review.order.listing.title,
+                'created_at': review.created_at,
+            })
+        
+        return Response(data)

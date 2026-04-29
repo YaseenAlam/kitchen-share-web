@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
+import { usePageTitle } from '../hooks/usePageTitle';
+
 
 function Profile() {
   const { user, setUser, becomeCook } = useAuth();
@@ -13,6 +15,7 @@ function Profile() {
   const [myOrders, setMyOrders] = useState([]);
   const [incomingOrders, setIncomingOrders] = useState([]);
   const [cookProfile, setCookProfile] = useState(null);
+  usePageTitle('My Profile');
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editingCookProfile, setEditingCookProfile] = useState(false);
@@ -498,57 +501,51 @@ function Profile() {
             ) : (
               <div className="space-y-4">
                 {myOrders.map(order => (
-                  <div key={order.id} className="card p-6">
+                  <Link 
+                    key={order.id} 
+                    to={`/order/${order.id}`}
+                    className="card p-6 block hover:shadow-lg transition-all cursor-pointer"
+                  >
                     <div className="flex flex-col md:flex-row justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="font-display text-xl" style={{ color: 'var(--color-dark)' }}>
-                            {order.listing_title}
-                          </h3>
-                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-                            {order.status}
-                          </span>
-                        </div>
-                        <p className="text-sm mb-2" style={{ color: 'var(--color-gray-500)' }}>
-                          Order #{order.id} • {formatDate(order.created_at)}
-                        </p>
-                        <div className="flex gap-4 text-sm" style={{ color: 'var(--color-gray-600)' }}>
-                          <span>Qty: {order.quantity}</span>
-                          <span>•</span>
-                          <span>Pickup: {formatDate(order.pickup_time)}</span>
-                        </div>
-                        {order.notes && (
-                          <p className="text-sm mt-2 italic" style={{ color: 'var(--color-gray-500)' }}>
-                            "{order.notes}"
-                          </p>
-                        )}
-
-                        {/* Review Section */}
-                        {order.status === 'completed' && (
-                          <div className="mt-4 pt-4 border-t">
-                            {order.review ? (
-                              <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--color-cream)' }}>
-                                <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-gray-600)' }}>Your Review</p>
-                                <p className="text-lg">{'⭐'.repeat(order.review.rating)}</p>
-                                {order.review.comment && (
-                                  <p className="text-sm mt-1 italic" style={{ color: 'var(--color-gray-600)' }}>
-                                    "{order.review.comment}"
-                                  </p>
-                                 )}
-                              </div>
-                            ) : (
-                              <ReviewForm orderId={order.id} onSubmit={fetchData} />
-                            )}
+                      <div className="flex gap-4">
+                        {order.listing_image ? (
+                          <img 
+                            src={order.listing_image} 
+                            alt={order.listing_title} 
+                            className="w-20 h-20 rounded-xl object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-2xl">🍽️</span>
                           </div>
                         )}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="font-display text-xl" style={{ color: 'var(--color-dark)' }}>
+                              {order.listing_title}
+                            </h3>
+                            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
+                              {order.status}
+                            </span>
+                          </div>
+                          <p className="text-sm mb-2" style={{ color: 'var(--color-gray-500)' }}>
+                            Order #{order.id} • {formatDate(order.created_at)}
+                          </p>
+                          <div className="flex gap-4 text-sm" style={{ color: 'var(--color-gray-600)' }}>
+                            <span>Qty: {order.quantity}</span>
+                            <span>•</span>
+                            <span>Pickup: {formatDate(order.pickup_time)}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-right">
+                      <div className="flex items-center gap-4">
                         <p className="text-2xl font-bold" style={{ color: 'var(--color-primary)' }}>
                           ${order.total_price}
                         </p>
+                        <span className="text-gray-400">→</span>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

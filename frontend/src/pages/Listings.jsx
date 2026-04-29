@@ -366,27 +366,34 @@ function Listings() {
                     className="card group animate-fadeInUp"
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
-                    <div className="relative overflow-hidden">
-                      {listing.image ? (
-                        <img
-                          src={listing.image}
-                          alt={listing.title}
-                          className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"
-                        />
-                      ) : (
-                        <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center">
-                          <span className="text-5xl">🍽️</span>
-                        </div>
-                      )}
-                      <div className="absolute top-3 right-3">
-                        <span className="badge badge-primary">${listing.price}</span>
+                  <div className="relative overflow-hidden">
+                    {listing.image ? (
+                      <img
+                        src={listing.image}
+                        alt={listing.title}
+                        className="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                    ) : (
+                      <div className="w-full h-48 bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center">
+                        <span className="text-5xl">🍽️</span>
                       </div>
-                      {listing.distance !== null && (
-                        <div className="absolute top-3 left-3">
-                          <span className="badge badge-success">{listing.distance} mi</span>
-                        </div>
-                      )}
+                    )}
+                    <div className="absolute top-3 right-3">
+                      <span className="badge badge-primary">${listing.price}</span>
                     </div>
+                    {listing.distance !== null && (
+                      <div className="absolute top-3 left-3">
+                        <span className="badge badge-success">{listing.distance} mi</span>
+                      </div>
+                    )}
+                    {/* Rating Badge */}
+                    {listing.cook_rating > 0 && (
+                      <div className="absolute bottom-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-sm">
+                        <span className="text-yellow-400 text-sm">★</span>
+                        <span className="text-white text-sm font-bold">{listing.cook_rating}</span>
+                      </div>
+                    )}
+                  </div>
                     <div className="p-5">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <h3 className="font-display text-xl" style={{ color: 'var(--color-dark)' }}>
@@ -405,7 +412,7 @@ function Listings() {
                             <span className="text-sm">👨‍🍳</span>
                           </div>
                           <Link 
-                            to={`/cook/${listing.cook}`} 
+                            to={`/cook/${listing.cook_name}`} 
                             className="text-sm font-medium hover:underline"
                             style={{ color: 'var(--color-primary)' }}
                             onClick={(e) => e.stopPropagation()}
@@ -438,17 +445,26 @@ function ListingCard({ listing, isSelected, onClick }) {
       }`}
     >
       <div className="flex gap-4 p-4">
-        {listing.image ? (
-          <img
-            src={listing.image}
-            alt={listing.title}
-            className="w-24 h-24 rounded-xl object-cover flex-shrink-0"
-          />
-        ) : (
-          <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center flex-shrink-0">
-            <span className="text-3xl">🍽️</span>
-          </div>
-        )}
+        <div className="relative flex-shrink-0">
+          {listing.image ? (
+            <img
+              src={listing.image}
+              alt={listing.title}
+              className="w-24 h-24 rounded-xl object-cover"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-xl bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center">
+              <span className="text-3xl">🍽️</span>
+            </div>
+          )}
+          {/* Rating Badge on Image */}
+          {listing.cook_rating > 0 && (
+            <div className="absolute -bottom-1 -right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/80 backdrop-blur-sm">
+              <span className="text-yellow-400 text-xs">★</span>
+              <span className="text-white text-xs font-bold">{listing.cook_rating}</span>
+            </div>
+          )}
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
             <h3 className="font-display text-lg truncate" style={{ color: 'var(--color-dark)' }}>
@@ -458,19 +474,26 @@ function ListingCard({ listing, isSelected, onClick }) {
               ${listing.price}
             </span>
           </div>
-          <span className="inline-block text-xs px-2 py-0.5 rounded-full mb-2" style={{ backgroundColor: 'var(--color-cream)', color: 'var(--color-gray-600)' }}>
-            {listing.cuisine_type}
-          </span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--color-cream)', color: 'var(--color-gray-600)' }}>
+              {listing.cuisine_type}
+            </span>
+            {listing.cook_total_orders > 0 && (
+              <span className="text-xs" style={{ color: 'var(--color-gray-400)' }}>
+                {listing.cook_total_orders} orders
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--color-gray-500)' }}>
-            <span>👨‍🍳 </span>
-          <Link
-            to={`/cook/${listing.cook}`}
-            className="hover:underline font-medium"
-            style={{ color: 'var(--color-primary)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {listing.cook_name}
-          </Link>
+            <span>👨‍🍳</span>
+            <Link
+              to={`/cook/${listing.cook_name}`}
+              className="hover:underline font-medium"
+              style={{ color: 'var(--color-primary)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {listing.cook_name}
+            </Link>
             <span>•</span>
             <span>⏱️ {listing.prep_time} min</span>
             {listing.distance !== null && (

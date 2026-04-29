@@ -28,9 +28,9 @@ function CreateListing() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Customization options
+ // Customization options
   const [customOptions, setCustomOptions] = useState([]);
-  const [addOns, setAddOns] = useState([]);
+  const [addOnGroups, setAddOnGroups] = useState([]);
 
   const cuisineOptions = [
     { value: 'american', label: 'American' },
@@ -131,24 +131,72 @@ function CreateListing() {
   };
 
   // Add-ons Management
-  const addAddOn = () => {
-    setAddOns([...addOns, { name: '', price: '' }]);
+  // Add-on Groups Management
+  const addAddOnGroup = () => {
+    setAddOnGroups([...addOnGroups, {
+      name: '',
+      items: [{ label: '', price: 0 }]
+    }]);
   };
 
-  const updateAddOn = (index, field, value) => {
-    const updated = [...addOns];
-    updated[index][field] = field === 'price' ? parseFloat(value) || 0 : value;
-    setAddOns(updated);
+  const updateAddOnGroup = (index, field, value) => {
+    const updated = [...addOnGroups];
+    updated[index][field] = value;
+    setAddOnGroups(updated);
   };
 
-  const removeAddOn = (index) => {
-    setAddOns(addOns.filter((_, i) => i !== index));
+  const removeAddOnGroup = (index) => {
+    setAddOnGroups(addOnGroups.filter((_, i) => i !== index));
+  };
+
+  const addAddOnItem = (groupIndex) => {
+    const updated = [...addOnGroups];
+    updated[groupIndex].items.push({ label: '', price: 0 });
+    setAddOnGroups(updated);
+  };
+
+  const updateAddOnItem = (groupIndex, itemIndex, field, value) => {
+    const updated = [...addOnGroups];
+    updated[groupIndex].items[itemIndex][field] = field === 'price' ? parseFloat(value) || 0 : value;
+    setAddOnGroups(updated);
+  };
+
+  const removeAddOnItem = (groupIndex, itemIndex) => {
+    const updated = [...addOnGroups];
+    updated[groupIndex].items = updated[groupIndex].items.filter((_, i) => i !== itemIndex);
+    setAddOnGroups(updated);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    // Validation
+    if (!formData.title) {
+      setError('Please enter a dish name');
+      setStep(1);
+      setLoading(false);
+      return;
+    }
+    if (!formData.description) {
+      setError('Please enter a description');
+      setStep(1);
+      setLoading(false);
+      return;
+    }
+    if (!formData.price || parseFloat(formData.price) <= 0) {
+      setError('Please enter a valid price');
+      setStep(1);
+      setLoading(false);
+      return;
+    }
+    if (!formData.prep_time || parseInt(formData.prep_time) <= 0) {
+      setError('Please enter prep time');
+      setStep(1);
+      setLoading(false);
+      return;
+    }
 
     try {
       const data = new FormData();
@@ -157,20 +205,44 @@ function CreateListing() {
       data.append('price', formData.price);
       data.append('cuisine_type', formData.cuisine_type);
       data.append('prep_time', formData.prep_time);
-      data.append('servings', formData.servings);
+      data.append('servings', formData.servings || 1);
       data.append('available', true);
-      data.append('dietary_tags', JSON.stringify(formData.dietary_tags));
-      data.append('ingredients', formData.ingredients);
-      data.append('allergens', JSON.stringify(formData.allergens));
-      data.append('spice_level', formData.spice_level);
+      data.append('dietary_tags', JSON.stringify(formData.dietary_tags || []));
+      data.append('ingredients', formData.ingredients || '');
+      data.append('allergens', JSON.stringify(formData.allergens || []));
+      data.append('spice_level', formData.spice_level || '');
       if (formData.calories) data.append('calories', formData.calories);
       
       // Filter out empty options
-      const validOptions = customOptions.filter(o => o.name && o.options.some(opt => opt.label));
+      // Filter and clean customization options
+      const validOptions = customOptions
+        .filter(o => o.name && o.options.some(opt => opt.label))
+        .map(o => ({
+          name: o.name,
+          required: o.required || false,
+          options: o.options
+            .filter(opt => opt.label)
+            .map(opt => ({
+              label: opt.label,
+              price: parseFloat(opt.price) || 0
+            }))
+        }));
       data.append('customization_options', JSON.stringify(validOptions));
       
-      const validAddOns = addOns.filter(a => a.name && a.price);
-      data.append('add_ons', JSON.stringify(validAddOns));
+      // Filter and clean add-ons
+      // Filter and clean add-on groups
+      const validAddOnGroups = addOnGroups
+        .filter(g => g.name && g.items.some(item => item.label))
+        .map(g => ({
+          name: g.name,
+          items: g.items
+            .filter(item => item.label)
+            .map(item => ({
+              label: item.label,
+              price: parseFloat(item.price) || 0
+            }))
+        }));
+      data.append('add_ons', JSON.stringify(validAddOnGroups));
       
       if (location) {
         data.append('latitude', location.lat.toFixed(6));
@@ -181,13 +253,45 @@ function CreateListing() {
         data.append('image', image);
       }
 
+      console.log('customization_options:', JSON.stringify(validOptions));
+      console.log('add_ons:', JSON.stringify(validAddOnGroups));      
+      // Log all form data
+      for (let [key, value] of data.entries()) {
+        console.log(`${key}:`, value);
+      }
+
       await api.post('/listings/', data, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
       navigate('/');
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to create listing');
+    }  catch (err) {
+      console.error('Full error:', err);
+      console.error('Error response:', err.response);
+      console.error('Error data:', err.response?.data);
+      
+      // Handle different error formats
+      const errorData = err.response?.data;
+      if (errorData) {
+        if (typeof errorData === 'string') {
+          setError(errorData);
+        } else if (errorData.detail) {
+          setError(errorData.detail);
+        } else if (typeof errorData === 'object') {
+          // Field-level errors
+          const fieldErrors = Object.entries(errorData)
+            .map(([field, messages]) => {
+              const msg = Array.isArray(messages) ? messages.join(', ') : messages;
+              return `${field}: ${msg}`;
+            })
+            .join('\n');
+          setError(fieldErrors || 'Failed to create listing');
+        }
+      } else if (err.message) {
+        setError(err.message);
+      } else {
+        setError('Failed to create listing. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -537,19 +641,24 @@ function CreateListing() {
           {/* Step 3: Customizations */}
           {step === 3 && (
             <div className="card p-6 space-y-6">
-              <h2 className="font-display text-2xl" style={{ color: 'var(--color-dark)' }}>
+              <h2 className="font-display text-xl" style={{ color: 'var(--color-dark)' }}>
                 Customization Options
               </h2>
               <p style={{ color: 'var(--color-gray-600)' }}>
                 Let customers customize their order - add size options, toppings, and more!
               </p>
 
-              {/* Custom Options */}
+              {/* Custom Options (Single Select) */}
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <label className="font-medium" style={{ color: 'var(--color-gray-700)' }}>
-                    Options (e.g. Size, Spice Level)
-                  </label>
+                  <div>
+                    <label className="font-medium" style={{ color: 'var(--color-gray-700)' }}>
+                      Options (Pick One)
+                    </label>
+                    <p className="text-sm" style={{ color: 'var(--color-gray-500)' }}>
+                      e.g. Size, Spice Level - customer picks one choice
+                    </p>
+                  </div>
                   <button
                     type="button"
                     onClick={addCustomOption}
@@ -560,8 +669,14 @@ function CreateListing() {
                   </button>
                 </div>
 
+                {customOptions.length === 0 && (
+                  <p className="text-sm p-4 rounded-xl text-center" style={{ backgroundColor: 'var(--color-cream)', color: 'var(--color-gray-500)' }}>
+                    No options yet. Add options like "Size" or "Spice Level".
+                  </p>
+                )}
+
                 {customOptions.map((option, optIndex) => (
-                  <div key={optIndex} className="p-4 rounded-xl mb-4" style={{ backgroundColor: 'var(--color-cream)' }}>
+                  <div key={optIndex} className="p-4 rounded-xl mb-4 border-2 border-blue-100" style={{ backgroundColor: '#f0f9ff' }}>
                     <div className="flex gap-4 mb-3">
                       <input
                         type="text"
@@ -582,12 +697,13 @@ function CreateListing() {
                       <button
                         type="button"
                         onClick={() => removeCustomOption(optIndex)}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-red-500 hover:text-red-700 text-xl"
                       >
-                        🗑️
+                        ×
                       </button>
                     </div>
 
+                    <p className="text-sm mb-2 ml-1" style={{ color: 'var(--color-gray-500)' }}>Choices (customer picks one):</p>
                     {option.options.map((choice, choiceIndex) => (
                       <div key={choiceIndex} className="flex gap-2 mb-2 ml-4">
                         <input
@@ -597,24 +713,25 @@ function CreateListing() {
                           className="input flex-1"
                           placeholder="Choice (e.g. Large)"
                         />
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">+$</span>
+                        <div className="flex items-center gap-1 bg-white rounded-xl border-2 border-gray-100 px-3">
+                          <span className="text-gray-400 text-sm">+$</span>
                           <input
                             type="number"
                             value={choice.price || ''}
                             onChange={(e) => updateOptionChoice(optIndex, choiceIndex, 'price', e.target.value)}
-                            className="input pl-8 w-24"
-                            placeholder="0"
+                            className="w-16 py-3 outline-none text-right"
+                            placeholder="0.00"
                             step="0.01"
+                            min="0"
                           />
                         </div>
                         {option.options.length > 1 && (
                           <button
                             type="button"
                             onClick={() => removeOptionChoice(optIndex, choiceIndex)}
-                            className="text-red-400 hover:text-red-600"
+                            className="text-red-400 hover:text-red-600 px-2"
                           >
-                            ✕
+                            ×
                           </button>
                         )}
                       </div>
@@ -622,8 +739,7 @@ function CreateListing() {
                     <button
                       type="button"
                       onClick={() => addOptionChoice(optIndex)}
-                      className="text-sm ml-4 mt-2"
-                      style={{ color: 'var(--color-primary)' }}
+                      className="text-sm ml-4 mt-2 text-blue-600 hover:text-blue-700"
                     >
                       + Add Choice
                     </button>
@@ -631,48 +747,90 @@ function CreateListing() {
                 ))}
               </div>
 
-              {/* Add-ons */}
+              {/* Add-on Groups (Multi Select) */}
               <div>
                 <div className="flex justify-between items-center mb-4">
-                  <label className="font-medium" style={{ color: 'var(--color-gray-700)' }}>
-                    Add-ons (e.g. Extra Cheese)
-                  </label>
+                  <div>
+                    <label className="font-medium" style={{ color: 'var(--color-gray-700)' }}>
+                      Add-ons (Pick Multiple)
+                    </label>
+                    <p className="text-sm" style={{ color: 'var(--color-gray-500)' }}>
+                      e.g. Toppings, Extras - customer can pick multiple
+                    </p>
+                  </div>
                   <button
                     type="button"
-                    onClick={addAddOn}
-                    className="text-sm font-medium px-3 py-1 rounded-full bg-orange-100 hover:bg-orange-200 transition-all"
-                    style={{ color: 'var(--color-primary)' }}
+                    onClick={addAddOnGroup}
+                    className="text-sm font-medium px-3 py-1 rounded-full bg-green-100 hover:bg-green-200 transition-all text-green-700"
                   >
-                    + Add Add-on
+                    + Add Group
                   </button>
                 </div>
 
-                {addOns.map((addon, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={addon.name}
-                      onChange={(e) => updateAddOn(index, 'name', e.target.value)}
-                      className="input flex-1"
-                      placeholder="Add-on name (e.g. Extra Cheese)"
-                    />
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">+$</span>
+                {addOnGroups.length === 0 && (
+                  <p className="text-sm p-4 rounded-xl text-center" style={{ backgroundColor: 'var(--color-cream)', color: 'var(--color-gray-500)' }}>
+                    No add-on groups yet. Create groups like "Proteins", "Toppings", or "Extras".
+                  </p>
+                )}
+
+                {addOnGroups.map((group, groupIndex) => (
+                  <div key={groupIndex} className="p-4 rounded-xl mb-4 border-2 border-green-100" style={{ backgroundColor: '#f0fdf4' }}>
+                    <div className="flex gap-4 mb-3">
                       <input
-                        type="number"
-                        value={addon.price || ''}
-                        onChange={(e) => updateAddOn(index, 'price', e.target.value)}
-                        className="input pl-8 w-24"
-                        placeholder="1.50"
-                        step="0.01"
+                        type="text"
+                        value={group.name}
+                        onChange={(e) => updateAddOnGroup(groupIndex, 'name', e.target.value)}
+                        className="input flex-1"
+                        placeholder="Group name (e.g. Toppings, Proteins, Extras)"
                       />
+                      <button
+                        type="button"
+                        onClick={() => removeAddOnGroup(groupIndex)}
+                        className="text-red-500 hover:text-red-700 text-xl"
+                      >
+                        ×
+                      </button>
                     </div>
+
+                    <p className="text-sm mb-2 ml-1" style={{ color: 'var(--color-gray-500)' }}>Items (customer can pick multiple):</p>
+                    {group.items.map((item, itemIndex) => (
+                      <div key={itemIndex} className="flex gap-2 mb-2 ml-4">
+                        <input
+                          type="text"
+                          value={item.label}
+                          onChange={(e) => updateAddOnItem(groupIndex, itemIndex, 'label', e.target.value)}
+                          className="input flex-1"
+                          placeholder="Item (e.g. Extra Cheese)"
+                        />
+                        <div className="flex items-center gap-1 bg-white rounded-xl border-2 border-gray-100 px-3">
+                          <span className="text-gray-400 text-sm">+$</span>
+                          <input
+                            type="number"
+                            value={item.price || ''}
+                            onChange={(e) => updateAddOnItem(groupIndex, itemIndex, 'price', e.target.value)}
+                            className="w-16 py-3 outline-none text-right"
+                            placeholder="0.00"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        {group.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeAddOnItem(groupIndex, itemIndex)}
+                            className="text-red-400 hover:text-red-600 px-2"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
                     <button
                       type="button"
-                      onClick={() => removeAddOn(index)}
-                      className="text-red-500 hover:text-red-700"
+                      onClick={() => addAddOnItem(groupIndex)}
+                      className="text-sm ml-4 mt-2 text-green-600 hover:text-green-700"
                     >
-                      🗑️
+                      + Add Item
                     </button>
                   </div>
                 ))}

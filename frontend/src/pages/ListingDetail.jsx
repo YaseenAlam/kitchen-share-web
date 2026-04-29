@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 function ListingDetail() {
   const { id } = useParams();
@@ -9,6 +10,7 @@ function ListingDetail() {
   const navigate = useNavigate();
   
   const [listing, setListing] = useState(null);
+  usePageTitle(listing?.title);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -20,7 +22,8 @@ function ListingDetail() {
   const [pickupTime, setPickupTime] = useState('');
   const [notes, setNotes] = useState('');
   const [ordering, setOrdering] = useState(false);
-  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [reviews, setReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(false);
 
   useEffect(() => {
     fetchListing();
@@ -39,6 +42,19 @@ function ListingDetail() {
         }
       });
       setSelectedOptions(initialOptions);
+
+      // Fetch reviews for this cook
+      if (response.data.cook_name) {
+        setLoadingReviews(true);
+        try {
+          const reviewsRes = await api.get(`/auth/cook/${response.data.cook_name}/reviews/`);
+          setReviews(reviewsRes.data || []);
+        } catch (err) {
+          console.log('No reviews found');
+        } finally {
+          setLoadingReviews(false);
+        }
+      }
     } catch (err) {
       setError('Listing not found');
     } finally {
@@ -85,20 +101,25 @@ function ListingDetail() {
     setOrdering(true);
     setError('');
 
+    // Debug - log what we're sending
+    const orderData = {
+      listing: id,
+      quantity,
+      pickup_time: pickupTime,
+      notes,
+      selected_options: selectedOptions,
+      selected_add_ons: selectedAddOns,
+    };
+    console.log('Sending order:', orderData);
+
     try {
-      await api.post('/orders/', {
-        listing: id,
-        quantity,
-        pickup_time: pickupTime,
-        notes,
-        selected_options: selectedOptions,
-        selected_add_ons: selectedAddOns,
-      });
+      const response = await api.post('/orders/', orderData);
       
-      setOrderSuccess(true);
-      setTimeout(() => navigate('/profile'), 2000);
+      // Redirect to order confirmation page
+      navigate(`/order/${response.data.id}`);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to place order');
+      console.error('Order error:', err.response?.data);
+      setError(err.response?.data?.detail || JSON.stringify(err.response?.data) || 'Failed to place order');
     } finally {
       setOrdering(false);
     }
@@ -128,21 +149,6 @@ function ListingDetail() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-cream)' }}>
-      {/* Order Success Modal */}
-      {orderSuccess && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="card p-8 text-center max-w-md animate-fadeInUp">
-            <div className="text-6xl mb-4">🎉</div>
-            <h2 className="font-display text-2xl mb-2" style={{ color: 'var(--color-dark)' }}>
-              Order Placed!
-            </h2>
-            <p style={{ color: 'var(--color-gray-600)' }}>
-              Redirecting to your orders...
-            </p>
-          </div>
-        </div>
-      )}
-
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -306,6 +312,155 @@ function ListingDetail() {
               </div>
             )}
 
+            {/* Reviews Section */}
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-display text-2xl" style={{ color: 'var(--color-dark)' }}>
+                  Customer Reviews
+                </h3>
+                {listing.cook_rating > 0 && (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}>
+                    <span className="text-xl">⭐</span>
+                    <span className="font-bold text-lg">{listing.cook_rating}</span>
+                    <span className="text-sm opacity-80">({listing.cook_total_orders} orders)</span>
+                  </div>
+                )}
+              </div>
+
+              {loadingReviews ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl animate-bounce">⭐</div>
+                  <p style={{ color: 'var(--color-gray-500)' }}>Loading reviews...</p>
+                </div>
+              ) : reviews.length === 0 ? (
+                <div className="text-center py-8 rounded-xl" style={{ backgroundColor: 'var(--color-cream)' }}>
+                  <div className="text-5xl mb-3">🌟</div>
+                  <p className="font-medium" style={{ color: 'var(--color-dark)' }}>No reviews yet</p>
+                  <p className="text-sm" style={{ color: 'var(--color-gray-500)' }}>
+                    Be the first to try this dish and leave a review!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Review Stats Bar */}
+                  {reviews.length >= 3 && (
+                    <div className="grid grid-cols-5 gap-2 p-4 rounded-xl mb-4" style={{ backgroundColor: 'var(--color-cream)' }}>
+                      {[5, 4, 3, 2, 1].map(star => {
+                        const count = reviews.filter(r => r.rating === star).length;
+                        const percentage = (count / reviews.length) * 100;
+                        return (
+                          <div key={star} className="flex flex-col items-center">
+                            <div className="flex items-center gap-1 mb-1">
+                              <span className="text-sm font-medium">{star}</span>
+                              <span className="text-xs">⭐</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full transition-all"
+                                style={{ 
+                                  width: `${percentage}%`,
+                                  backgroundColor: star >= 4 ? '#22c55e' : star === 3 ? '#eab308' : '#ef4444'
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs mt-1" style={{ color: 'var(--color-gray-500)' }}>
+                              {count}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Individual Reviews */}
+                  {reviews.slice(0, 5).map((review, idx) => (
+                    <div 
+                      key={review.id || idx} 
+                      className="p-5 rounded-xl border-2 transition-all hover:shadow-md"
+                      style={{ borderColor: 'var(--color-gray-100)', backgroundColor: 'white' }}
+                    >
+                      <div className="flex items-start gap-4">
+                        {/* Avatar */}
+                        <div 
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0"
+                          style={{ 
+                            backgroundColor: `hsl(${(review.reviewer_name?.charCodeAt(0) || 0) * 10}, 70%, 90%)`,
+                            color: `hsl(${(review.reviewer_name?.charCodeAt(0) || 0) * 10}, 70%, 40%)`
+                          }}
+                        >
+                          {review.reviewer_name?.charAt(0).toUpperCase() || '?'}
+                        </div>
+
+                        <div className="flex-1">
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <p className="font-bold" style={{ color: 'var(--color-dark)' }}>
+                                {review.reviewer_name}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <div className="flex">
+                                  {[1, 2, 3, 4, 5].map(star => (
+                                    <span 
+                                      key={star} 
+                                      className={`text-lg ${star <= review.rating ? '' : 'opacity-30'}`}
+                                    >
+                                      ⭐
+                                    </span>
+                                  ))}
+                                </div>
+                                {review.listing_title && review.listing_title !== listing.title && (
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100" style={{ color: 'var(--color-gray-500)' }}>
+                                    {review.listing_title}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-sm" style={{ color: 'var(--color-gray-400)' }}>
+                              {new Date(review.created_at).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          </div>
+
+                          {/* Comment */}
+                          {review.comment && (
+                            <p 
+                              className="leading-relaxed"
+                              style={{ color: 'var(--color-gray-600)' }}
+                            >
+                              "{review.comment}"
+                            </p>
+                          )}
+
+                          {/* Verified Badge */}
+                          <div className="mt-3 flex items-center gap-1">
+                            <span className="text-green-500 text-sm">✓</span>
+                            <span className="text-xs" style={{ color: 'var(--color-gray-400)' }}>
+                              Verified order
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Show More Link */}
+                  {reviews.length > 5 && (
+                    <Link 
+                      to={`/cook/${listing.cook_name}`}
+                      className="block text-center py-3 rounded-xl font-medium transition-all hover:bg-orange-50"
+                      style={{ color: 'var(--color-primary)' }}
+                    >
+                      See all {reviews.length} reviews →
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Owner Actions */}
             {isOwner && (
               <div className="card p-6">
@@ -385,26 +540,53 @@ function ListingDetail() {
 
                   {/* Add-ons */}
                   {listing.add_ons?.length > 0 && (
-                    <div className="mb-6">
-                      <label className="block font-medium mb-2" style={{ color: 'var(--color-gray-700)' }}>
-                        Add-ons
-                      </label>
-                      <div className="space-y-2">
-                        {listing.add_ons.map((addon, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleAddOnToggle(addon)}
-                            className={`w-full p-3 rounded-xl text-left flex justify-between items-center transition-all ${
-                              selectedAddOns.find(a => a.name === addon.name)
-                                ? 'bg-orange-100 border-2 border-orange-500'
-                                : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
-                            }`}
-                          >
-                            <span>{addon.name}</span>
-                            <span style={{ color: 'var(--color-gray-500)' }}>+${addon.price.toFixed(2)}</span>
-                          </button>
-                        ))}
-                      </div>
+                    <div className="mb-6 space-y-4">
+                      {listing.add_ons.map((group, gIdx) => (
+                        <div key={gIdx}>
+                          <label className="block font-medium mb-2" style={{ color: 'var(--color-gray-700)' }}>
+                            {group.name || 'Add-ons'}
+                          </label>
+                          <div className="space-y-2">
+                            {(group.items || [group]).map((item, iIdx) => {
+                              const itemKey = `${group.name || 'addon'}-${item.label || item.name}`;
+                              const isSelected = selectedAddOns.find(a => 
+                                (a.label === item.label || a.name === item.name) && 
+                                (a.group === group.name || !group.name)
+                              );
+                              return (
+                                <button
+                                  key={iIdx}
+                                  onClick={() => {
+                                    const addon = { 
+                                      ...item, 
+                                      group: group.name,
+                                      label: item.label || item.name,
+                                      name: item.label || item.name
+                                    };
+                                    if (isSelected) {
+                                      setSelectedAddOns(selectedAddOns.filter(a => 
+                                        !((a.label === addon.label || a.name === addon.name) && a.group === addon.group)
+                                      ));
+                                    } else {
+                                      setSelectedAddOns([...selectedAddOns, addon]);
+                                    }
+                                  }}
+                                  className={`w-full p-3 rounded-xl text-left flex justify-between items-center transition-all ${
+                                    isSelected
+                                      ? 'bg-green-100 border-2 border-green-500'
+                                      : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <span>{item.label || item.name}</span>
+                                  <span style={{ color: 'var(--color-gray-500)' }}>
+                                    +${(item.price || 0).toFixed(2)}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 

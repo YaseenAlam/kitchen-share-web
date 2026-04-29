@@ -8,30 +8,28 @@ function CookProfile() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reviews, setReviews] = useState([]);
 
-  useEffect(() => {
-    fetchCookProfile();
+ useEffect(() => {
+    const fetchCookData = async () => {
+      try {
+        const profileRes = await api.get(`/auth/cook/${username}/`);
+        setProfile(profileRes.data);
+
+        const listingsRes = await api.get(`/listings/?cook=${username}`);        setListings(listingsRes.data.results || listingsRes.data || []);
+        
+        // Fetch reviews for this cook
+        const reviewsRes = await api.get(`/auth/cook/${username}/reviews/`);
+        setReviews(reviewsRes.data || []);
+      } catch (err) {
+        setError('Cook not found');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCookData();
   }, [username]);
-
-  const fetchCookProfile = async () => {
-    try {
-      const [profileRes, listingsRes] = await Promise.all([
-        api.get(`/auth/cook/${username}/`),
-        api.get('/listings/')
-      ]);
-      
-      setProfile(profileRes.data);
-      
-      // Filter listings by this cook
-      const allListings = listingsRes.data.results || [];
-      setListings(allListings.filter(l => l.cook_name === username));
-    } catch (err) {
-      setError('Cook not found');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getPaymentIcon = (payment) => {
     const icons = {
       cash: '💵',
@@ -304,6 +302,48 @@ function CookProfile() {
                     </div>
                   </Link>
                 ))}
+                {/* Reviews Section */}
+          {reviews.length > 0 && (
+            <div className="mt-8">
+              <h2 className="font-display text-2xl mb-4" style={{ color: 'var(--color-dark)' }}>
+                ⭐ Reviews ({reviews.length})
+              </h2>
+              <div className="space-y-4">
+                {reviews.map(review => (
+                  <div key={review.id} className="card p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                        <span>👤</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-medium" style={{ color: 'var(--color-dark)' }}>
+                            {review.reviewer_name}
+                          </p>
+                          <span className="text-sm" style={{ color: 'var(--color-gray-400)' }}>
+                            {new Date(review.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 mb-2">
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <span key={star} className="text-sm">
+                              {star <= review.rating ? '⭐' : '☆'}
+                            </span>
+                          ))}
+                          <span className="text-sm ml-1" style={{ color: 'var(--color-gray-500)' }}>
+                            for {review.listing_title}
+                          </span>
+                        </div>
+                        {review.comment && (
+                          <p style={{ color: 'var(--color-gray-600)' }}>"{review.comment}"</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
               </div>
             )}
           </div>

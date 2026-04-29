@@ -24,20 +24,11 @@ class ListingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Listing.objects.filter(available=True)
 
-        search = self.request.query_params.get('search')
-        cuisine = self.request.query_params.get('cuisine')
-        min_price = self.request.query_params.get('min_price')
-        max_price = self.request.query_params.get('max_price')
+        # Filter by cook (username)
+        cook = self.request.query_params.get('cook')
+        if cook:
+            queryset = queryset.filter(cook__username=cook)
 
-        if search:
-            queryset = queryset.filter(title__icontains=search)
-        if cuisine:
-            queryset = queryset.filter(cuisine_type=cuisine)
-        if min_price:
-            queryset = queryset.filter(price__gte=min_price)
-        if max_price:
-            queryset = queryset.filter(price__lte=max_price)
-        
         # Search by title or description
         search = self.request.query_params.get('search')
         if search:
@@ -49,6 +40,14 @@ class ListingViewSet(viewsets.ModelViewSet):
         cuisine = self.request.query_params.get('cuisine')
         if cuisine and cuisine != 'all':
             queryset = queryset.filter(cuisine_type=cuisine)
+        
+        # Filter by price
+        min_price = self.request.query_params.get('min_price')
+        max_price = self.request.query_params.get('max_price')
+        if min_price:
+            queryset = queryset.filter(price__gte=min_price)
+        if max_price:
+            queryset = queryset.filter(price__lte=max_price)
         
         # Filter by dietary tags (multiple allowed)
         dietary_list = self.request.query_params.getlist('dietary')

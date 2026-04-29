@@ -1,5 +1,5 @@
 import 'leaflet/dist/leaflet.css';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import { useState, useEffect } from 'react';
@@ -127,6 +127,7 @@ function ListingsMap({ listings, userLocation, selectedListing, onSelectListing 
       `}</style>
       
       <MapContainer
+        
         center={[userLocation.lat, userLocation.lng]}
         zoom={14}
         className="h-full w-full"

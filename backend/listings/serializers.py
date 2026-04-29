@@ -6,18 +6,13 @@ import json
 class ListingSerializer(serializers.ModelSerializer):
     cook_name = serializers.CharField(source='cook.username', read_only=True)
     cook_image = serializers.ImageField(source='cook.profile_image', read_only=True)
-    cook_bio = serializers.CharField(source='cook.cook_profile.bio', read_only=True)
-    cook_rating = serializers.DecimalField(source='cook.cook_profile.rating', max_digits=3, decimal_places=2, read_only=True)
-    cook_total_orders = serializers.IntegerField(source='cook.cook_profile.total_orders', read_only=True)
-    accepted_payments = serializers.JSONField(source='cook.cook_profile.accepted_payments', read_only=True)
-    payment_notes = serializers.CharField(source='cook.cook_profile.payment_notes', read_only=True)
-    pickup_instructions = serializers.CharField(source='cook.cook_profile.pickup_instructions', read_only=True)
+    cook_bio = serializers.SerializerMethodField()
+    cook_rating = serializers.SerializerMethodField()
+    cook_total_orders = serializers.SerializerMethodField()
+    accepted_payments = serializers.SerializerMethodField()
+    payment_notes = serializers.SerializerMethodField()
+    pickup_instructions = serializers.SerializerMethodField()
     distance = serializers.SerializerMethodField()
-    
-    dietary_tags = serializers.JSONField(required=False, default=list)
-    allergens = serializers.JSONField(required=False, default=list)
-    customization_options = serializers.JSONField(required=False, default=list)
-    add_ons = serializers.JSONField(required=False, default=list)
 
     class Meta:
         model = Listing
@@ -32,16 +27,35 @@ class ListingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'cook', 'created_at', 'updated_at']
 
-    def to_internal_value(self, data):
-        if isinstance(data, dict):
-            data = data.copy()
-            for field in ['dietary_tags', 'allergens', 'customization_options', 'add_ons']:
-                if field in data and isinstance(data[field], str):
-                    try:
-                        data[field] = json.loads(data[field])
-                    except (json.JSONDecodeError, TypeError):
-                        data[field] = []
-        return super().to_internal_value(data)
+    def get_cook_bio(self, obj):
+        if hasattr(obj.cook, 'cook_profile'):
+            return obj.cook.cook_profile.bio
+        return None
+
+    def get_cook_rating(self, obj):
+        if hasattr(obj.cook, 'cook_profile'):
+            return obj.cook.cook_profile.rating
+        return 0
+
+    def get_cook_total_orders(self, obj):
+        if hasattr(obj.cook, 'cook_profile'):
+            return obj.cook.cook_profile.total_orders
+        return 0
+
+    def get_accepted_payments(self, obj):
+        if hasattr(obj.cook, 'cook_profile'):
+            return obj.cook.cook_profile.accepted_payments
+        return []
+
+    def get_payment_notes(self, obj):
+        if hasattr(obj.cook, 'cook_profile'):
+            return obj.cook.cook_profile.payment_notes
+        return ''
+
+    def get_pickup_instructions(self, obj):
+        if hasattr(obj.cook, 'cook_profile'):
+            return obj.cook.cook_profile.pickup_instructions
+        return ''
 
     def get_distance(self, obj):
         request = self.context.get('request')
@@ -65,3 +79,26 @@ class ListingSerializer(serializers.ModelSerializer):
                 distance = r * c
                 return round(distance, 1)
         return None
+
+    def to_internal_value(self, data):
+        # Handle both regular dict and QueryDict from FormData
+        if hasattr(data, 'dict'):
+            # It's a QueryDict, convert to regular dict
+            data = data.dict()
+        else:
+            data = dict(data)
+        
+        # Parse JSON string fields
+        json_fields = ['dietary_tags', 'allergens', 'customization_options', 'add_ons']
+        for field in json_fields:
+            if field in data:
+                value = data[field]
+                if isinstance(value, str):
+                    try:
+                        data[field] = json.loads(value)
+                    except (json.JSONDecodeError, TypeError):
+                        data[field] = []
+                elif value is None:
+                    data[field] = []
+        
+        return super().to_internal_value(data)
