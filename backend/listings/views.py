@@ -49,27 +49,25 @@ class ListingViewSet(viewsets.ModelViewSet):
         if max_price:
             queryset = queryset.filter(price__lte=max_price)
         
-        # Filter by dietary tags (multiple allowed)
+        # Filter by dietary tags
         dietary_list = self.request.query_params.getlist('dietary')
         if dietary_list:
             for dietary in dietary_list:
                 queryset = queryset.filter(dietary_tags__contains=dietary)
         
-        # Get user location from query params
+        # Distance filtering
         user_lat = self.request.query_params.get('lat')
         user_lng = self.request.query_params.get('lng')
         max_distance = self.request.query_params.get('distance')
         
-        # Only filter by distance if ALL params are provided
         if user_lat and user_lng and max_distance:
             try:
                 user_lat = float(user_lat)
                 user_lng = float(user_lng)
                 max_distance = float(max_distance)
                 
-                # Calculate distance for each listing
-                nearby_ids = []
-                no_location_ids = []
+                # Calculate distance and filter
+                listings_with_distance = []
                 
                 for listing in queryset:
                     if listing.latitude and listing.longitude:
@@ -82,18 +80,22 @@ class ListingViewSet(viewsets.ModelViewSet):
                         dlon = lon2 - lon1
                         a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
                         c = 2 * atan2(sqrt(a), sqrt(1-a))
-                        r = 3956  # miles
+                        r = 3956
                         distance = r * c
                         
                         if distance <= max_distance:
-                            nearby_ids.append(listing.id)
+                            listings_with_distance.append((listing.id, distance))
                     else:
-                        # Include listings without location
-                        no_location_ids.append(listing.id)
+                        listings_with_distance.append((listing.id, 0))
                 
-                # Combine nearby + no location
-                all_ids = nearby_ids + no_location_ids
-                queryset = queryset.filter(id__in=all_ids)
+                # Sort by distance (closest first)
+                listings_with_distance.sort(key=lambda x: x[1])
+                sorted_ids = [item[0] for item in listings_with_distance]
+                
+                # Preserve the sorted order
+                preserved = {id: index for index, id in enumerate(sorted_ids)}
+                queryset = sorted(queryset.filter(id__in=sorted_ids), key=lambda x: preserved[x.id])
+                return queryset
                     
             except (ValueError, TypeError):
                 pass
