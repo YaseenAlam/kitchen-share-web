@@ -1,146 +1,222 @@
 import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import api from '../api/axios';
 
 function Register() {
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    password2: '',
+  });
   const [error, setError] = useState('');
-  const { register, setUser } = useAuth();
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { register, googleLogin } = useAuth();
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
-  
-  if (password !== passwordConfirm) {
-    setError('Passwords do not match');
-    return;
-  }
-  
-  try {
-    await register(username, email, password, passwordConfirm);
-    
-    // Check if there's a redirect path stored
-    const redirectPath = sessionStorage.getItem('redirectAfterLogin');
-    if (redirectPath) {
-      sessionStorage.removeItem('redirectAfterLogin');
-      navigate(redirectPath);
-    } else {
-      navigate('/');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (formData.password !== formData.password2) {
+      setError('Passwords do not match');
+      return;
     }
-  } catch (err) {
-    setError(err.response?.data?.detail || 'Registration failed');
-  }
-};
+
+    setLoading(true);
+
+    try {
+      await register(formData.username, formData.email, formData.password);
+      navigate('/');
+    } catch (err) {
+      setError(err.response?.data?.detail || err.response?.data?.email?.[0] || err.response?.data?.username?.[0] || 'Registration failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      const response = await api.post('/auth/google/', {
-        token: credentialResponse.credential,
-      });
-      
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
-      setUser(response.data.user);
+      await googleLogin(credentialResponse.credential);
       navigate('/');
     } catch (err) {
-      setError('Google sign up failed');
+      setError('Google login failed. Please try again.');
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">Register</h2>
-
-        {error && (
-          <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
-            {error}
+    <div className="min-h-screen flex">
+      {/* Left Side - Clean Marketing */}
+      <div 
+        className="hidden lg:flex lg:w-1/2 flex-col justify-center px-16"
+        style={{ backgroundColor: 'var(--color-primary)' }}
+      >
+        <div className="max-w-lg">
+          <div className="flex items-center gap-3 mb-12">
+            <span className="text-5xl">🍳</span>
+            <span className="font-display text-3xl font-bold text-white">Kitchen Share</span>
           </div>
-        )}
+          
+          <h1 className="font-display text-5xl font-bold text-white mb-6 leading-tight">
+            Join your local food community
+          </h1>
+          
+          <p className="text-xl text-white/80 mb-12 leading-relaxed">
+            Whether you're a home cook ready to share your recipes or a food lover looking for authentic meals — there's a place for you here.
+          </p>
 
-        {/* Google Sign Up Button */}
-        <div className="mb-6">
-          <GoogleLogin
-            onSuccess={handleGoogleSuccess}
-            onError={() => setError('Google sign up failed')}
-            width="100%"
-            text="signup_with"
-          />
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">1</div>
+              <p className="text-lg text-white">Create your free account</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">2</div>
+              <p className="text-lg text-white">Browse dishes or become a cook</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">3</div>
+              <p className="text-lg text-white">Connect with your neighbors</p>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div className="flex items-center mb-6">
-          <div className="flex-1 border-t border-gray-300"></div>
-          <span className="px-4 text-gray-500 text-sm">or</span>
-          <div className="flex-1 border-t border-gray-300"></div>
+      {/* Right Side - Register Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8" style={{ backgroundColor: 'var(--color-cream)' }}>
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center mb-8">
+            <span className="text-5xl">🍳</span>
+            <h1 className="font-display text-3xl font-bold mt-2" style={{ color: 'var(--color-primary)' }}>
+              Kitchen Share
+            </h1>
+          </div>
+
+          {/* Form Card */}
+          <div className="bg-white rounded-2xl shadow-xl p-8">
+            <div className="text-center mb-8">
+              <h2 className="font-display text-3xl font-bold" style={{ color: 'var(--color-dark)' }}>
+                Create Account
+              </h2>
+              <p className="mt-2" style={{ color: 'var(--color-gray-500)' }}>
+                Start your food journey today
+              </p>
+            </div>
+
+            {error && (
+              <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-100">
+                <p className="text-red-600 text-sm text-center">{error}</p>
+              </div>
+            )}
+
+            {/* Google Sign Up */}
+            <div className="flex justify-center mb-6">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => setError('Google signup failed')}
+                shape="rectangular"
+                size="large"
+                text="signup_with"
+              />
+            </div>
+
+            {/* Divider */}
+            <div className="flex items-center mb-6">
+              <div className="flex-1 border-t border-gray-200"></div>
+              <span className="px-4 text-sm" style={{ color: 'var(--color-gray-400)' }}>or sign up with email</span>
+              <div className="flex-1 border-t border-gray-200"></div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark)' }}>
+                  Username
+                </label>
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-500 focus:outline-none transition-colors"
+                  placeholder="yourname"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark)' }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-500 focus:outline-none transition-colors"
+                  placeholder="you@example.com"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark)' }}>
+                  Password
+                </label>
+                <input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-500 focus:outline-none transition-colors"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark)' }}>
+                  Confirm Password
+                </label>
+                <input
+                  type="password"
+                  value={formData.password2}
+                  onChange={(e) => setFormData({ ...formData, password2: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-500 focus:outline-none transition-colors"
+                  placeholder="••••••••"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 rounded-xl font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: 'var(--color-primary)' }}
+              >
+                {loading ? 'Creating Account...' : 'Create Account'}
+              </button>
+            </form>
+
+            {/* Sign In Link */}
+            <p className="text-center mt-6" style={{ color: 'var(--color-gray-600)' }}>
+              Already have an account?{' '}
+              <Link 
+                to="/login" 
+                className="font-semibold hover:underline"
+                style={{ color: 'var(--color-primary)' }}
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+
+          {/* Footer */}
+          <p className="text-center mt-6 text-sm" style={{ color: 'var(--color-gray-400)' }}>
+            By signing up, you agree to our Terms of Service
+          </p>
         </div>
-
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-gray-700 mb-2">Username</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-gray-700 mb-2">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            />
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-gray-700 mb-2">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            />
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-gray-700 mb-2">Confirm Password</label>
-            <input
-              type="password"
-              value={passwordConfirm}
-              onChange={(e) => setPasswordConfirm(e.target.value)}
-              className="w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full bg-orange-500 text-white py-3 rounded hover:bg-orange-600"
-          >
-            Register
-          </button>
-        </form>
-
-        <p className="mt-4 text-center text-gray-600">
-          Already have an account?{' '}
-          <Link to="/login" className="text-orange-500 hover:underline">
-            Login
-          </Link>
-        </p>
       </div>
     </div>
   );
 }
+
 export default Register;
