@@ -54,3 +54,51 @@ class RegisterSerializer(serializers.ModelSerializer):
         validated_data.pop('password_confirm')
         user = User.objects.create_user(**validated_data)
         return user
+    
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.contrib.auth import authenticate
+
+
+class EmailOrUsernameTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """
+    Allows users to log in with either their username OR email address.
+    The frontend still sends the value in the 'username' field, but we 
+    check email too if no username match is found.
+    """
+
+    def validate(self, attrs):
+        login_value = attrs.get('username', '').strip()
+        password = attrs.get('password')
+
+        # Try to find user by username first, then fall back to email
+        user = None
+        if '@' in login_value:
+            # Looks like an email — try email lookup
+            try:
+                user_obj = User.objects.get(email__iexact=login_value)
+                user = authenticate(
+                    request=self.context.get('request'),
+                    username=user_obj.username,
+                    password=password,
+                )
+            except User.DoesNotExist:
+                user = None
+        else:
+            # Treat as username
+            user = authenticate(
+                request=self.context.get('request'),
+                username=login_value,
+                password=password,
+            )
+
+        if user is None:
+            raise serializers.ValidationError({
+                'detail': 'No active account found with the given credentials'
+            })
+
+        # Build the token pair using the standard SimpleJWT method
+        refresh = self.get_token(user)
+        return {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }

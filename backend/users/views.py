@@ -12,8 +12,14 @@ from .serializers import UserSerializer, RegisterSerializer, CookProfileSerializ
 from .models import CookProfile
 from orders.models import Review
 from orders.serializers import ReviewSerializer
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import EmailOrUsernameTokenObtainPairSerializer
 
 User = get_user_model()
+
+class EmailOrUsernameLoginView(TokenObtainPairView):
+    serializer_class = EmailOrUsernameTokenObtainPairSerializer
+
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -51,6 +57,55 @@ class BecomeCookView(APIView):
         CookProfile.objects.get_or_create(user=user)
         return Response({"detail": "You are now a cook!", "redirect": "/cook-setup"}, status=status.HTTP_201_CREATED)
 
+class UnenrollCookView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from orders.models import Order
+        from listings.models import Listing
+
+        user = request.user
+        if not user.is_cook:
+            return Response(
+                {"detail": "You are not a cook."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Block if there are any active orders on this cook's listings.
+        # "Active" = not yet completed and not cancelled.
+        active_statuses = ['pending', 'accepted', 'preparing', 'ready']
+        active_orders = Order.objects.filter(
+            listing__cook=user,
+            status__in=active_statuses,
+        )
+
+        if active_orders.exists():
+            return Response(
+                {
+                    "detail": (
+                        f"You have {active_orders.count()} active order(s). "
+                        "Please fulfill or cancel them before unenrolling."
+                    ),
+                    "active_order_count": active_orders.count(),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Soft delete: mark all this cook's listings as unavailable.
+        # Order history stays intact because we don't touch the listings.
+        Listing.objects.filter(cook=user).update(available=False)
+
+        # Flip cook flag off. We keep the CookProfile row so if they
+        # re-enroll later, their bio/specialties/etc are still there.
+        user.is_cook = False
+        user.save()
+
+        return Response(
+            {"detail": "You have unenrolled as a cook. Your listings have been hidden."},
+            status=status.HTTP_200_OK,
+        )
+    
+    
 class CookPublicProfileView(generics.RetrieveAPIView):
     permission_classes = [permissions.AllowAny]
 

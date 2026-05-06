@@ -105,14 +105,14 @@ function Login() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--color-dark)' }}>
-                  Email Address
+                  Email Address or Username
                 </label>
                 <input
-                  type="email"
+                  type="text"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-orange-500 focus:outline-none transition-colors"
-                  placeholder="you@example.com"
+                  placeholder="Username or you@example.com"
                   required
                 />
               </div>

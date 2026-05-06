@@ -36,15 +36,16 @@ export function AuthProvider({ children }) {
     return response.data;
   };
 
-  const register = async (username, email, password, passwordConfirm) => {
-    const response = await api.post('/auth/register/', {
-      username,
-      email,
-      password,
-      password_confirm: passwordConfirm,
-    });
-    return response.data;
-  };
+  const register = async (username, email, password, ConfirmPassword) => {
+  await api.post('/auth/register/', {
+    username,
+    email,
+    password,
+    password_confirm: ConfirmPassword,
+  });
+  // Auto-login after successful registration
+  return await login(username, password);
+};
 
   const logout = () => {
     localStorage.removeItem('access_token');
@@ -64,9 +65,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const unenrollCook = async () => {
+    const response = await api.post('/auth/unenroll-cook/');
+    // Refresh user data so is_cook flips to false in the UI
+    const userResponse = await api.get('/auth/me/');
+    setUser(userResponse.data);
+    return response.data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, becomeCook }}>
-      {children}
+    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, becomeCook, unenrollCook }}>      {children}
     </AuthContext.Provider>
   );
 }

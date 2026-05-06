@@ -4,8 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 function Profile() {
-  const { user, setUser, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, setUser, logout, unenrollCook } = useAuth();  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   
   const [activeTab, setActiveTab] = useState('overview');
@@ -19,7 +18,27 @@ function Profile() {
   const [isEditingCook, setIsEditingCook] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
-  
+  const [showUnenrollConfirm, setShowUnenrollConfirm] = useState(false);
+  const [unenrolling, setUnenrolling] = useState(false);
+  const [unenrollError, setUnenrollError] = useState('');
+
+  const handleUnenroll = async () => {
+    setUnenrolling(true);
+    setUnenrollError('');
+    try {
+      await unenrollCook();
+      setShowUnenrollConfirm(false);
+      setActiveTab('overview');
+      setSaveStatus('You have unenrolled as a cook. Your listings are hidden.');
+      setTimeout(() => setSaveStatus(''), 4000);
+    } catch (err) {
+      setUnenrollError(
+        err.response?.data?.detail || 'Failed to unenroll. Please try again.'
+      );
+    } finally {
+      setUnenrolling(false);
+    }
+  };
   // Profile form
   const [profileForm, setProfileForm] = useState({
     first_name: '',
@@ -252,6 +271,14 @@ function Profile() {
                   <span className="px-3 py-1 rounded-full text-sm font-medium" style={{ backgroundColor: 'var(--color-primary)', color: 'white' }}>
                     👨‍🍳 Cook
                   </span>
+                )}
+                {user?.is_cook && (
+                  <button
+                    onClick={() => setShowUnenrollConfirm(true)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium border-2 border-red-300 text-red-600 hover:bg-red-50 transition-all"
+                  >
+                    Stop Being a Cook
+                  </button>
                 )}
               </div>
               <p className="text-gray-500 mb-4">@{user?.username} • {user?.email}</p>
@@ -796,6 +823,52 @@ function Profile() {
           </div>
         )}
       </div>
+      {showUnenrollConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          onClick={() => !unenrolling && setShowUnenrollConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-2xl mb-3" style={{ color: 'var(--color-dark)' }}>
+              Stop being a cook?
+            </h3>
+            <p className="mb-4" style={{ color: 'var(--color-gray-600)' }}>
+              This will hide all your listings from buyers and remove the cook tools from your account. Your order history and cook profile info will be preserved in case you want to come back later.
+            </p>
+            <p className="mb-6 text-sm" style={{ color: 'var(--color-gray-500)' }}>
+              Note: if you have any active orders, you'll need to fulfill or cancel them first.
+            </p>
+
+            {unenrollError && (
+              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-100">
+                <p className="text-red-600 text-sm">{unenrollError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowUnenrollConfirm(false)}
+                disabled={unenrolling}
+                className="px-4 py-2 rounded-xl text-sm font-medium border-2 border-gray-300 text-gray-600 hover:bg-gray-100 transition-all disabled:opacity-50"
+              >
+                Never mind
+              </button>
+              <button
+                onClick={handleUnenroll}
+                disabled={unenrolling}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ backgroundColor: '#dc2626' }}
+              >
+                {unenrolling ? 'Unenrolling...' : 'Yes, unenroll me'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

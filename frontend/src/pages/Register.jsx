@@ -27,7 +27,7 @@ function Register() {
     setLoading(true);
 
     try {
-      await register(formData.username, formData.email, formData.password);
+      await register(formData.username, formData.email, formData.password, formData.password2);
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || err.response?.data?.email?.[0] || err.response?.data?.username?.[0] || 'Registration failed');

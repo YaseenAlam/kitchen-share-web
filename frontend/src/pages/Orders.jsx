@@ -4,21 +4,24 @@ import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
 
 function Orders() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  
-  const [activeTab, setActiveTab] = useState('my-orders');
-  const [myOrders, setMyOrders] = useState([]);
-  const [incomingOrders, setIncomingOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    fetchOrders();
-  }, [user, navigate]);
+const [activeTab, setActiveTab] = useState('my-orders');
+const [myOrders, setMyOrders] = useState([]);
+const [incomingOrders, setIncomingOrders] = useState([]);
+const [loading, setLoading] = useState(true);
+
+useEffect(() => {
+  // Wait for auth to finish loading before deciding anything
+  if (authLoading) return;
+
+  if (!user) {
+    navigate('/login');
+    return;
+  }
+  fetchOrders();
+}, [user, authLoading, navigate]);
 
   const fetchOrders = async () => {
     try {

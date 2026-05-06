@@ -5,8 +5,7 @@ import api from '../api/axios';
 
 function OrderConfirmation() {
   const { id } = useParams();
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();  const navigate = useNavigate();
   
   const [order, setOrder] = useState(null);
   const [listing, setListing] = useState(null);
@@ -22,11 +21,13 @@ function OrderConfirmation() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
  useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    fetchOrder();
+  if (authLoading) return;
+  
+  if (!user) {
+    navigate('/login');
+    return;
+  }
+  fetchOrder();
 
     // Auto-refresh every 30 seconds for active orders
     const interval = setInterval(() => {
@@ -36,7 +37,7 @@ function OrderConfirmation() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [id, user]);
+  }, [id, user, authLoading]);
 
   // Refetch when order status might have changed
   useEffect(() => {
@@ -398,7 +399,7 @@ function OrderConfirmation() {
                 <div>
                   <p className="text-sm font-medium" style={{ color: 'var(--color-gray-500)' }}>Cook</p>
                   <Link 
-                    to={`/cook/${listing?.cook_name}`} 
+                    to={`/cook/${order?.cook_name}`} 
                     className="flex items-center gap-3 mt-1 hover:opacity-80 transition-all"
                   >
                     <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center overflow-hidden">
@@ -409,18 +410,65 @@ function OrderConfirmation() {
                       )}
                     </div>
                     <span className="font-medium" style={{ color: 'var(--color-primary)' }}>
-                      {listing?.cook_name}
+                      {order?.cook_first_name && order?.cook_last_name
+                        ? `${order.cook_first_name} ${order.cook_last_name}`
+                        : order?.cook_name}
                     </span>
                   </Link>
                 </div>
 
-                {listing?.pickup_instructions && (
+                {/* Cook contact — only show for non-cancelled orders */}
+                {order.status !== 'cancelled' && (order?.cook_phone || order?.cook_address) && (
+                  <div className="p-4 rounded-xl border-2" style={{ borderColor: 'var(--color-primary)', backgroundColor: 'rgba(232, 93, 4, 0.05)' }}>
+                    <p className="text-sm font-semibold mb-3" style={{ color: 'var(--color-primary)' }}>
+                      📞 Contact Your Cook
+                    </p>
+
+                    {order?.cook_phone && (
+                      <a
+                        href={`tel:${order.cook_phone}`}
+                        className="flex items-center gap-3 p-3 rounded-lg mb-2 hover:opacity-80 transition-all"
+                        style={{ backgroundColor: 'white' }}
+                      >
+                        <span className="text-xl">📱</span>
+                        <div>
+                          <p className="text-xs" style={{ color: 'var(--color-gray-500)' }}>Tap to call</p>
+                          <p className="font-medium" style={{ color: 'var(--color-dark)' }}>
+                            {order.cook_phone}
+                          </p>
+                        </div>
+                      </a>
+                    )}
+
+                    {order?.cook_address && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.cook_address)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-3 rounded-lg hover:opacity-80 transition-all"
+                        style={{ backgroundColor: 'white' }}
+                      >
+                        <span className="text-xl">📍</span>
+                        <div className="flex-1">
+                          <p className="text-xs" style={{ color: 'var(--color-gray-500)' }}>Pickup address — tap for directions</p>
+                          <p className="font-medium" style={{ color: 'var(--color-dark)' }}>
+                            {order.cook_address}
+                          </p>
+                        </div>
+                        <span style={{ color: 'var(--color-primary)' }}>→</span>
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Pickup instructions now come from order, not listing */}
+                {order.status !== 'cancelled' && order?.cook_pickup_instructions && (
                   <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-cream)' }}>
                     <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-gray-700)' }}>
                       Pickup Instructions:
                     </p>
                     <p className="text-sm" style={{ color: 'var(--color-gray-600)' }}>
-                      {listing.pickup_instructions}
+                      {order.cook_pickup_instructions}
                     </p>
                   </div>
                 )}
